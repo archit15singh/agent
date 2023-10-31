@@ -1,6 +1,15 @@
-import autogen
+from autogen.agentchat.contrib.retrieve_assistant_agent import RetrieveAssistantAgent
+from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProxyAgent
+from autogen import UserProxyAgent
+from autogen import config_list_from_json
+from chromadb.utils import embedding_functions
+from langchain.text_splitter import SpacyTextSplitter
+from spacy import load
 
-config_list = autogen.config_list_from_json("OAI_CONFIG_LIST.json")
+
+nlp = load("en_core_web_sm")
+
+config_list = config_list_from_json('OAI_CONFIG_LIST.json')
 
 llm_config={
     "request_timeout": 600,
@@ -9,27 +18,32 @@ llm_config={
     "temperature": 0,
 }
 
-# create an AssistantAgent instance named "assistant"
-assistant = autogen.AssistantAgent(
+
+assistant = RetrieveAssistantAgent(
     name="assistant",
+    system_message="You are a helpful assistant.",
     llm_config=llm_config,
-)
-# create a UserProxyAgent instance named "user_proxy"
-user_proxy = autogen.UserProxyAgent(
-    name="user_proxy",
-    human_input_mode="TERMINATE",
-    max_consecutive_auto_reply=10,
-    is_termination_msg=lambda x: x.get("content", "").rstrip().endswith("TERMINATE"),
-    code_execution_config={"work_dir": "web"},
-    llm_config=llm_config,
-    system_message="""Reply TERMINATE if the task has been solved at full satisfaction.
-Otherwise, reply CONTINUE, or the reason why the task is not solved yet."""
 )
 
-# the assistant receives a message from the user, which contains the task description
-user_proxy.initiate_chat(
-    assistant,
-    message="""
-        scrape all links from this page https://python.langchain.com/docs/get_started/introduction.
-    """,
+openai_ef = embedding_functions.OpenAIEmbeddingFunction(api_key=config_list[0]['api_key'], model_name="text-embedding-ada-002")
+
+spacy_splitter = SpacyTextSplitter()
+
+ragproxyagent = RetrieveUserProxyAgent(
+    name="ragproxyagent",
+    retrieve_config={
+        "task": "qa",
+        "docs_path": "https://raw.githubusercontent.com/microsoft/autogen/main/README.md",
+        "custom_text_split_function": spacy_splitter.split_text,
+        "embedding_function": openai_ef,
+    },
 )
+
+assistant.reset()
+ragproxyagent.initiate_chat(assistant, problem="What is autogen?")
+
+assistant.reset()
+userproxyagent = UserProxyAgent(name="userproxyagent")
+userproxyagent.initiate_chat(assistant, message="What is autogen?")
+
+
