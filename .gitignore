@@ -160,3 +160,6 @@ cython_debug/
 #.idea/
 
 OAI_CONFIG_LIST.json
+
+
+api_log.json
