@@ -1,8 +1,11 @@
 import autogen
+import litellm
+
+litellm.debug = True
 
 config_list = [
     {
-        "api_base": "http://0.0.0.0:8000/v1",
+        "api_base": "http://0.0.0.0:8000",
         "api_type": "open_ai",
         "api_key" : "whatever",
     }
